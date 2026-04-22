@@ -158,3 +158,5 @@ Thumbs.db
 # Hugging Face Trainer / Deep Learning
 results/
 logs/
+
+.env
