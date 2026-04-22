@@ -114,89 +114,57 @@ This combination enables fine-tuning a 3B model in ~6 GB of GPU memory.
 
 ### Before vs After Fine-Tuning
 
-BEFORE:
+#### 1. Authentication Error
+> **User Prompt:** "I am getting a 401 unauthorized error while calling API"
 
-ID: auth_error
-USER: I am getting a 401 unauthorized error while calling API
+**Base Model Response (Before Fine-Tuning):**
+> To resolve the 401 Unauthorized error, first, ensure that your API credentials (like API key or token) are correctly entered and not expired. Also, check if the permissions required for your request match the settings in the API documentation. If the issue persists, please provide more details so I can assist further.
+>
+> Not sure? Let's troubleshoot step-by-step!
+> Let me know if you need help with verifying your credentials or any other steps to resolve this issue. If you have any specific API documentation or environment details, sharing them will be really helpful for diagnosis. Feel free to ask if you're stuck at any point!
 
------ BEFORE -----
-To resolve the 401 Unauthorized error, first, ensure that your API credentials (like API key or token) are correctly entered and not expired. Also, check if the permissions required for your request match the settings in the API documentation. If the issue persists, please provide more details so I can assist further. 
-
-Not sure? Let's troubleshoot step-by-step! 
-
-Let me know if you need help with verifying your credentials or any other steps to resolve this issue. 
-
-If you have any specific API documentation or environment details, sharing them will be really helpful for diagnosis. 
-
-Feel free to ask if you're stuck at any point!
-
-Thank you for providing the necessary information! 
-
-We'll work through it together to find a solution 
-
-========================================================================================================================================================================================================
-ID: billing_issue
-USER: I was charged twice for my subscription this month. Can you fix this?
-
------ BEFORE -----
-I understand your frustration. I will investigate and resolve this issue for you as soon as possible. Please provide your account details so we can look into it further. 
-
-========================================================================================================================================================================================================
-ID: feature_issue
-USER: I upgraded my plan but I still can't access premium features.
-
------ BEFORE -----
-I understand that upgrading your plan didn't grant you access to the premium features yet. Could you please check if there are any pending tasks or if there's a delay in activation? If so, could you guide me through the steps to resolve it quickly? Otherwise, I can help troubleshoot further if needed. Let me know how you would like proceed. 
-Noted that I'm here to assist you further. 
-
-========================================================================================================================================================================================================
-ID: app_crash
-USER: My app keeps crashing whenever I try to upload a file.
-
------ BEFORE -----
-I understand you're having trouble with your app crashing during file uploads. Can you please provide more details? What type of files are you trying to upload and on which device/operating system? Any error messages displayed?
+**Fine-Tuned Model Response (After Fine-Tuning):**
+> I understand your frustration with receiving a 401 Unauthorized error while making API calls. This error typically occurs when there is an issue with authentication or authorization. To resolve this, I recommend checking the following points:
+>
+> 1. **Authentication Token:** Ensure that you have provided the correct access token or API key in your request headers.
+> 2. **API Endpoint:** Verify that you are using the right endpoint for your API call.
+> 3. **Authorization Scope:** Double-check if your current permissions allow you to make the specific API call you are trying to make.
+> 4. **API Version:** Make sure you are using the correct version of the API.
 
 ---
 
-Response continues only if more information is provided by the user, as per the given instruction.
-If the user provides additional details or requests further assistance, I will respond accordingly. Otherwise, the conversation ends here based on the given instruction.
+#### 2. Billing Issue
+> **User Prompt:** "I was charged twice for my subscription this month. Can you fix this?"
 
-AFTER TRAINING
+**Base Model Response (Before Fine-Tuning):**
+> I understand your frustration. I will investigate and resolve this issue for you as soon as possible. Please provide your account details so we can look into it further.
 
-ID: auth_error
-USER: I am getting a 401 unauthorized error while calling API
+**Fine-Tuned Model Response (After Fine-Tuning):**
+> I apologize for any inconvenience caused by the double charge on your subscription. I'm here to help resolve this issue and ensure it doesn't happen again. Let's work together to find a solution. Could you please provide me with your account details or any specific information about the charges? This will allow me to investigate further and assist you promptly. Thank you for bringing this matter to my attention, and I appreciate your patience as we work towards resolving it.
 
------ AFTER ------
-I understand your frustration with receiving a 401 Unauthorized error while making API calls. This error typically occurs when there is an issue with authentication or authorization. To resolve this, I recommend checking the following points:
+---
 
-1. **Authentication Token:** Ensure that you have provided the correct access token or API key in your request headers.
-2. **API Endpoint:** Verify that you are using the right endpoint for your API call.
-3. **Authorization Scope:** Double-check if your current permissions allow you to make the specific API call you are trying to make.
-4. **API Version:** Make sure you are using the correct version of the API.
+#### 3. Feature Access
+> **User Prompt:** "I upgraded my plan but I still can't access premium features."
 
-If you still encounter issues after reviewing these points, please provide more details about the error message you receive and 
+**Base Model Response (Before Fine-Tuning):**
+> I understand that upgrading your plan didn't grant you access to the premium features yet. Could you please check if there are any pending tasks or if there's a delay in activation? If so, could you guide me through the steps to resolve it quickly? Otherwise, I can help troubleshoot further if needed. Let me know how you would like proceed.
 
-====================================================================================================
-ID: billing_issue
-USER: I was charged twice for my subscription this month. Can you fix this?
+**Fine-Tuned Model Response (After Fine-Tuning):**
+> I'm sorry to hear that you're experiencing difficulties accessing our premium features after upgrading. It's important for us to ensure your full access to all the benefits we offer. Let me quickly investigate and resolve this issue for you. Please provide me with some details about the specific premium features you're unable to access, such as their names or descriptions. This will help me in diagnosing the problem accurately and finding a solution swiftly. Thank you for bringing this to our attention, and I'll do everything I can to assist you.
 
------ AFTER ------
-I apologize for any inconvenience caused by the double charge on your subscription. I'm here to help resolve this issue and ensure it doesn't happen again. Let's work together to find a solution. Could you please provide me with your account details or any specific information about the charges? This will allow me to investigate further and assist you promptly. Thank you for bringing this matter to my attention, and I appreciate your patience as we work towards resolving it. 
+---
 
-====================================================================================================
-ID: feature_issue
-USER: I upgraded my plan but I still can't access premium features.
+#### 4. Application Crash
+> **User Prompt:** "My app keeps crashing whenever I try to upload a file."
 
------ AFTER ------
-I'm sorry to hear that you're experiencing difficulties accessing our premium features after upgrading. It's important for us to ensure your full access to all the benefits we offer. Let me quickly investigate and resolve this issue for you. Please provide me with some details about the specific premium features you're unable to access, such as their names or descriptions. This will help me in diagnosing the problem accurately and finding a solution swiftly. Thank you for bringing this to our attention, and I'll do everything I can to assist you. 
+**Base Model Response (Before Fine-Tuning):**
+> I understand you're having trouble with your app crashing during file uploads. Can you please provide more details? What type of files are you trying to upload and on which device/operating system? Any error messages displayed?
 
-====================================================================================================
-ID: app_crash
-USER: My app keeps crashing whenever I try to upload a file.
+**Fine-Tuned Model Response (After Fine-Tuning):**
+> I'm sorry to hear that your app is crashing when you attempt to upload a file. It's important to address this issue promptly to ensure a seamless user experience. To help resolve this problem, could you please provide more details about the specific error message or any other relevant information? This will allow me to investigate the issue further and find a solution for you. Thank you for bringing this to our attention, and I appreciate your patience as we work together to troubleshoot and resolve the crash issue.
 
------ AFTER ------
-I'm sorry to hear that your app is crashing when you attempt to upload a file. It's important to address this issue promptly to ensure a seamless user experience. To help resolve this problem, could you please provide more details about the specific error message or any other relevant information? This will allow me to investigate the issue further and find a solution for you. Thank you for bringing this to our attention, and I appreciate your patience as we work together to troubleshoot and resolve the crash issue. 
-
+---
 
 
 ---
