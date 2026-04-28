@@ -56,8 +56,11 @@ lora_config = LoraConfig(
     lora_alpha=32,
     target_modules=["q_proj", "v_proj"],
     lora_dropout=0.05,
-    bias="none",
-    task_type="CAUSAL_LM"
+    bias="none",    # Do not train any bias terms, "all" - train all bias, "lora-only" - only for layers where LoRA is applied
+    task_type="CAUSAL_LM"  # GPT-style training - text generation
+    # task_type="SEQ_CLS"   # classification (BERT)
+    # task_type="SEQ_2_SEQ_LM"   # translation (T5 (text to text transfer transformer), BART)
+    # task_type="FEATURE_EXTRACTION"   # embeddings
 )
 
 model = get_peft_model(model, lora_config)
@@ -77,7 +80,7 @@ training_args = TrainingArguments(
     bf16=True,
     save_steps=200,
     warmup_steps=100,
-    report_to="none"
+    report_to="none"  # ML flow
 )
 
 def formatting_func(example):
@@ -101,7 +104,7 @@ pipe = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    max_new_tokens=200
+    max_new_tokens=200  # how many tokens the model is allowed to generate as output.
 )
 
 prompts = [
