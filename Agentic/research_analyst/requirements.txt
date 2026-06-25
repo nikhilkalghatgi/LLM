@@ -8,7 +8,12 @@ mlflow
 nltk
 numpy
 fastapi
-uvicorn
+uvicorn[standard]
+python-multipart
 ragas
 datasets
 torch
+guardrails-ai
+langchain-community
+langchain-core
+pytest

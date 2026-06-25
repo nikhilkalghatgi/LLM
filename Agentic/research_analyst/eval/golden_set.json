@@ -1,0 +1,50 @@
+[
+  {
+    "question": "What are the main contributions of this work?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What methodology was used in the research?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What were the key results and findings?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What are the limitations acknowledged by the authors?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "How does this work compare to prior approaches?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What datasets or benchmarks were used for evaluation?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What future work do the authors suggest?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What problem does this research address?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What evaluation metrics were used?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What are the practical applications of this research?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What assumptions does the research rely on?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  },
+  {
+    "question": "What is the significance of the results?",
+    "ground_truth": "The document should contain relevant information about this topic."
+  }
+]

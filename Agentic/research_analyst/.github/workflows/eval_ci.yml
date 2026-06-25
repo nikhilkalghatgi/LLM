@@ -1,0 +1,26 @@
+name: Eval CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run guardrail tests
+        run: pytest tests/test_guardrails.py -v
+      - name: Run eval tests
+        run: pytest tests/test_eval.py -v
+      - name: Check eval thresholds
+        run: |
+          echo "Eval CI passed — RAGAS thresholds enforced in test_eval.py"
+

@@ -11,3 +11,55 @@ chroma_persist_dir: "./chroma_db"
 guardrail_cosine_threshold: 0.7
 max_react_steps: 6
 mlflow_experiment_name: "research_analyst"
+
+# ---------------------------------------------------------------------------
+# Day 2 — Guardrails (input + output safety checks)
+# ---------------------------------------------------------------------------
+guardrails:
+  cosine_threshold: 0.70           # output grounding check
+  topic_relevance_threshold: 0.25  # input topic check (lower = stricter)
+  injection_keywords:              # list of strings to flag
+    - "ignore previous instructions"
+    - "disregard your system prompt"
+    - "you are now"
+    - "pretend you are"
+    - "jailbreak"
+    - "DAN"
+  pii_patterns:                    # regex patterns
+    - '\b[A-Z]{5}[0-9]{4}[A-Z]\b'                  # PAN card
+    - '\b[2-9]{1}[0-9]{3}\s[0-9]{4}\s[0-9]{4}\b'   # Aadhaar
+    - '\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b'  # email
+    - '\b(\+91[\-\s]?)?[6-9]\d{9}\b'               # Indian mobile
+
+# ---------------------------------------------------------------------------
+# Day 2 — RAGAS evaluation
+# ---------------------------------------------------------------------------
+eval:
+  golden_set_path: "./eval/golden_set.json"
+  faithfulness_threshold: 0.70
+  answer_relevance_threshold: 0.65
+  context_precision_threshold: 0.60
+  ragas_llm_model: mistral
+  ragas_embedding_model: sentence-transformers/all-MiniLM-L6-v2
+
+# ---------------------------------------------------------------------------
+# Day 3 — FastAPI server settings
+# ---------------------------------------------------------------------------
+serve:
+  host: "0.0.0.0"
+  port: 8000
+  reload: false
+  log_level: "info"
+  max_upload_size_mb: 50
+  request_timeout_seconds: 300
+
+# ---------------------------------------------------------------------------
+# Day 3 — Filesystem paths (mounted as Docker volumes)
+# ---------------------------------------------------------------------------
+paths:
+  chroma_db: "./chroma_db"
+  mlflow_tracking: "./mlruns"
+  uploads: "./uploads"
+  eval_reports: "./eval_reports"
+  sample_pdfs: "./sample_pdfs"
+

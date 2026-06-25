@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.github
+*.egg-info
+dist
+build
+.pytest_cache
+chroma_db/
+mlruns/
+uploads/
+eval_reports/
+.env
+*.log
+

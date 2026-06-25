@@ -55,6 +55,7 @@ class ReActOrchestrator:
             "formatted_context": None,
             "analysis": None,
             "feedback": None,
+            "retrieved_chunks": None,
         }
 
     def _call_llm(self, prompt: str) -> str:
@@ -117,6 +118,7 @@ class ReActOrchestrator:
         if tool == "retriever":
             result = self.retriever_agent.run(query=tool_input)
             self._context["formatted_context"] = result["formatted_context"]
+            self._context["retrieved_chunks"] = result["chunks"]
             num_chunks = len(result["chunks"])
             return (
                 f"Retrieved {num_chunks} relevant passages.\n\n"
@@ -211,6 +213,7 @@ class ReActOrchestrator:
             "formatted_context": None,
             "analysis": None,
             "feedback": None,
+            "retrieved_chunks": None,
         }
 
         trace: List[Dict] = []
@@ -263,4 +266,7 @@ class ReActOrchestrator:
             "report": report,
             "trace": trace,
             "steps_taken": len(trace),
+            "analysis": self._context.get("analysis"),
+            "feedback": self._context.get("feedback"),
+            "retrieved_chunks": self._context.get("retrieved_chunks") or [],
         }
