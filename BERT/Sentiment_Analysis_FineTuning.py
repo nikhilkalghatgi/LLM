@@ -34,6 +34,8 @@ training_args = TrainingArguments(
     per_device_eval_batch_size=64,
     num_train_epochs=1,
     eval_strategy="epoch",
+    # evaluation_strategy = "steps",
+    # eval_steps = 500,
     logging_dir="./logs",
 )
 

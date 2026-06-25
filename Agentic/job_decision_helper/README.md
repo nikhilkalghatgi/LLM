@@ -1,17 +1,17 @@
-# 🤖 Agentic Job Decision Helper
+# Agentic Job Decision Helper
 
 An intelligent, LangGraph-powered conversational agent designed to help you make informed career choices, navigate the AI hype, and analyze industry trends. The agent organically grounds its reasoning in both your localized, internal knowledge base and live web trends.
 
-## ✨ Features
+## Features
 
 - **Agentic ReAct Architecture**: Utilizes a `LangGraph` prebuilt ReAct agent paired with `gemini-2.5-flash` for high-speed, intelligent tool orchestration.
 - **RAG Backend**: A powerful local vector store powered by `ChromaDB` and Google Gemini Embeddings (`gemini-embedding-001`) that indexes local docs, job descriptions, and markdown files.
 - **Tool-Calling Ecosystem**:
-    - 📁 **RAG Retriever:** Injects embedded internal knowledge about specifics formatting/rules/roles directly into the agent.
-    - 🌍 **Web Search:** Leverages the `Tavily` API for live, up-to-date queries on internet trends.
-    - 📊 **Role Analyzer:** A custom post-processing heuristic tool that dynamically extracts skills frequency distributions and salary signals from raw blobs of markdown.
+    -  **RAG Retriever:** Injects embedded internal knowledge about specifics formatting/rules/roles directly into the agent.
+    -  **Web Search:** Leverages the `Tavily` API for live, up-to-date queries on internet trends.
+    -  **Role Analyzer:** A custom post-processing heuristic tool that dynamically extracts skills frequency distributions and salary signals from raw blobs of markdown.
 
-## 📂 Project Structure
+##  Project Structure
 
 ```text
 job_decision_helper/
@@ -21,7 +21,7 @@ job_decision_helper/
 └── data/               # Source data directories (blogs, github, jobs)
 ```
 
-## 🚀 Setup & Usage
+##  Setup & Usage
 
 ### 1. Requirements
 
