@@ -158,5 +158,5 @@ Thumbs.db
 # Hugging Face Trainer / Deep Learning
 results/
 logs/
-
+Agentic/job_decision_helper/vectorstore/
 .env

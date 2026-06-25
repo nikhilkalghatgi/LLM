@@ -1,0 +1,14 @@
+pymupdf
+sentence-transformers
+chromadb
+rank-bm25
+ollama
+pyyaml
+mlflow
+nltk
+numpy
+fastapi
+uvicorn
+ragas
+datasets
+torch

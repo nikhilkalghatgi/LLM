@@ -1,0 +1,13 @@
+# Research Analyst Configuration
+embedding_model: "all-MiniLM-L6-v2"
+chunk_size: 300
+chunk_overlap: 50
+retrieval_top_k: 20
+reranker_top_n: 5
+reranker_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+llm_model: "mistral"
+llm_base_url: "http://localhost:11434"
+chroma_persist_dir: "./chroma_db"
+guardrail_cosine_threshold: 0.7
+max_react_steps: 6
+mlflow_experiment_name: "research_analyst"
