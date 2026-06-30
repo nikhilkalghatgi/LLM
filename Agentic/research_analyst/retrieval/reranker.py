@@ -17,6 +17,7 @@ class HybridReranker:
         dense: DenseRetriever,
         sparse: SparseRetriever,
         reranker_model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        cross_encoder: "CrossEncoder | None" = None,
     ) -> None:
         """Initialise with dense/sparse retrievers and load the cross-encoder.
 
@@ -24,10 +25,13 @@ class HybridReranker:
             dense: DenseRetriever instance.
             sparse: SparseRetriever instance.
             reranker_model_name: HuggingFace model ID for the cross-encoder reranker.
+            cross_encoder: Optional pre-loaded CrossEncoder to share across many
+                tenants (avoids reloading the model per tenant). When ``None`` a
+                fresh model is loaded from ``reranker_model_name``.
         """
         self.dense = dense
         self.sparse = sparse
-        self.cross_encoder = CrossEncoder(reranker_model_name)
+        self.cross_encoder = cross_encoder or CrossEncoder(reranker_model_name)
 
     def _reciprocal_rank_fusion(
         self,

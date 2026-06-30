@@ -11,11 +11,51 @@ services:
       - ./uploads:/app/uploads
       - ./eval_reports:/app/eval_reports
       - ./sample_pdfs:/app/sample_pdfs
+      - ./state:/app/state         # SQLite metadata DB (users/docs/jobs/audit/review)
+      - ./inbox:/app/inbox         # watched-folder drop zone
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      # Default to the in-process thread backend. Set to "celery" (here AND on
+      # the worker service) to use the async worker below.
+      - JOB_BACKEND=thread
+      # Always override the JWT secret in any real deployment.
+      - JWT_SECRET_KEY=change-me-in-production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
     depends_on:
       - ollama
       - mlflow
+      - redis
+    restart: unless-stopped
+
+  # Optional async worker. Only does work when JOB_BACKEND=celery on BOTH this
+  # service and the api service.
+  worker:
+    build: .
+    command: >
+      celery -A jobs.celery_app.celery_app worker
+      --loglevel=info --concurrency=1
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      - ./mlruns:/app/mlruns
+      - ./uploads:/app/uploads
+      - ./sample_pdfs:/app/sample_pdfs
+      - ./state:/app/state
+      - ./inbox:/app/inbox
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - JOB_BACKEND=celery
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      - redis
+      - ollama
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
   ollama:

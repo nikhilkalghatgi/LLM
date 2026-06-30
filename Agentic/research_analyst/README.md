@@ -1,62 +1,150 @@
-# AI Research Analyst
+# Financial Document Analyst — Production, End-to-End
 
-> A local-first, multi-agent RAG system that reads your PDFs and writes cited, evaluated research reports — with guardrails and RAGAS scoring on every query.
+> A local-first, **multi-tenant** AI platform for **regulatory & financial document intelligence**.
+> It ingests RBI / SEBI circulars, Basel III policy, and bank annual reports, answers questions with a
+> cited multi-agent RAG pipeline, and wraps every query in the things a bank actually cares about:
+> **auth, async jobs, audit trails, human review, and an ops dashboard.**
 
----
-
-## Architecture
-
-```
-Multi-agent ReAct system: Orchestrator → [RetrieverAgent | AnalystAgent | CriticAgent] → ReportWriter
-RAG pipeline: PDF → sentence-aware chunking → dense (all-MiniLM) + sparse (BM25) → RRF merge → cross-encoder reranker
-Guardrails: input (injection detection, PII, topic relevance) + output (citation grounding, toxicity)
-Eval: RAGAS (faithfulness, answer relevance, context precision) logged to MLflow per run
-```
-
-**Request flow for a query:**
-
-```
-question
-   │
-   ▼
-InputGuard ──► (injection → PII → topic relevance)  ──► blocked? return reason
-   │ clean_query
-   ▼
-ReActOrchestrator ──► RetrieverAgent ──► AnalystAgent ──► CriticAgent  (Thought/Action/Observation loop)
-   │ analysis + retrieved_chunks
-   ▼
-ReportWriter ──► structured report w/ inline [Source: file, Page: N] citations + confidence score
-   │ report
-   ▼
-OutputGuard ──► (citation grounding cosine check → toxicity → has-citations)  ──► hard-block or soft-warn
-   │
-   ▼
-RAGAS (per-query) ──► faithfulness / answer relevance / context precision ──► MLflow
-```
+This started as a generic "AI Research Analyst" RAG demo. The feedback was *"make it end to end"* —
+which, in a banking/enterprise context, means **data in → business value out, with everything in between
+observable, recoverable, and auditable.** This repo is that upgrade. It still runs entirely on a laptop.
 
 ---
 
-## Setup (3 commands)
+## 📚 Documentation map
+
+Read these in order. The `understand_*` guides connect the **theory** to the **exact files** that implement it,
+with block diagrams.
+
+| Topic | How-to (run it) | Theory ↔ implementation |
+| ----- | --------------- | ----------------------- |
+| Whole system | this file | [docs/understand/understand_end_to_end_architecture.md](docs/understand/understand_end_to_end_architecture.md) |
+| RAG core (standalone) | [docs/README_RAG.md](docs/README_RAG.md) | [docs/understand/understand_rag.md](docs/understand/understand_rag.md) |
+| Multi-agent ReAct | [docs/README_RAG.md](docs/README_RAG.md) | [docs/understand/understand_multi_agent_react.md](docs/understand/understand_multi_agent_react.md) |
+| Guardrails | [docs/README_API.md](docs/README_API.md) | [docs/understand/understand_guardrails.md](docs/understand/understand_guardrails.md) |
+| Evaluation (RAGAS) | [docs/README_API.md](docs/README_API.md) | [docs/understand/understand_evaluation_ragas.md](docs/understand/understand_evaluation_ragas.md) |
+| Auth + multi-tenancy | [docs/README_AUTH_TENANCY.md](docs/README_AUTH_TENANCY.md) | [docs/understand/understand_auth_jwt_multitenancy.md](docs/understand/understand_auth_jwt_multitenancy.md) |
+| Async job queue | [docs/README_JOBS_ASYNC.md](docs/README_JOBS_ASYNC.md) | [docs/understand/understand_async_jobs.md](docs/understand/understand_async_jobs.md) |
+| Data pipeline (watcher) | [docs/README_DATA_PIPELINE.md](docs/README_DATA_PIPELINE.md) | [docs/understand/understand_data_pipeline.md](docs/understand/understand_data_pipeline.md) |
+| Audit + human review | [docs/README_AUDIT_REVIEW.md](docs/README_AUDIT_REVIEW.md) | [docs/understand/understand_audit_compliance.md](docs/understand/understand_audit_compliance.md) · [understand_human_in_the_loop.md](docs/understand/understand_human_in_the_loop.md) |
+| Monitoring dashboard | [docs/README_DASHBOARD.md](docs/README_DASHBOARD.md) | [docs/understand/understand_observability.md](docs/understand/understand_observability.md) |
+| HTTP API reference | [docs/README_API.md](docs/README_API.md) | — |
+
+---
+
+## Architecture (production)
+
+```mermaid
+flowchart TD
+    drop["📂 Document drop<br/>inbox/&lt;tenant&gt;/*.pdf"] --> watcher["watchdog watcher<br/>pipeline/watcher.py"]
+    upload["POST /jobs/ingest/upload<br/>(JWT, multipart)"] --> jm
+    watcher --> jm["JobManager<br/>jobs/manager.py"]
+    jm -->|thread or Celery| ingestw["Ingestion worker"]
+    ingestw --> chroma[("ChromaDB<br/>per-tenant collection<br/>{tenant}_documents")]
+    ingestw --> docs[("documents table<br/>SQLite")]
+
+    login["POST /auth/token"] --> jwt["JWT (tenant, role)"]
+    ask["POST /jobs/query<br/>(JWT)"] --> jm
+    jm --> qworker["Query worker"]
+    qworker --> ig["Input guard"]
+    ig --> react["ReAct orchestrator<br/>retriever→analyst→critic"]
+    react --> chroma
+    react --> rw["Report writer"]
+    rw --> og["Output guard"]
+    og --> ragas["RAGAS faithfulness"]
+    ragas --> decide{"confidence ≥ 0.6<br/>& faithful ≥ 0.5?"}
+    decide -->|yes| release["Auto-approve → return report"]
+    decide -->|no| review[("review_queue<br/>human checkpoint")]
+    qworker --> audit[("audit_log<br/>full decision trail")]
+    audit --> dash["📊 /dashboard + /metrics/summary"]
+    ragas --> mlflow["MLflow per-query"]
+```
+
+> Legacy single-collection endpoints from the original demo (`/query`, `/ingest`, `/eval`, `/health`) are
+> kept for backward compatibility. **New work uses the authenticated `/jobs/*` endpoints.**
+
+---
+
+## Run it on your laptop (no Docker, no Redis required)
+
+The default job backend is an **in-process thread pool**, so you need *zero* extra
+infrastructure to see the whole system work. SQLite stores all state in one file.
 
 ```bash
-git clone <your-repo-url> && cd research_analyst
+# 0. one-time
 pip install -r requirements.txt
-ollama pull mistral
+ollama pull mistral          # needs Ollama running: `ollama serve`
+
+# 1. create an offline-safe financial PDF corpus (synthetic RBI/SEBI/Basel/annual report)
+python -m scripts.make_financial_corpus
+
+# 2. start the API (seeds tenants + users, builds the per-tenant pipeline)
+uvicorn serve.api:app --port 8000
 ```
 
-> Requires [Ollama](https://ollama.com) running locally (`ollama serve`) for all LLM calls.
+Then, in another terminal, drive it over HTTP (full walk-through in
+[docs/README_API.md](docs/README_API.md)):
+
+```bash
+# log in as the risk-team analyst -> get a JWT
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/token \
+  -d "username=bob&password=risk123" | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+# upload a PDF -> returns a job_id (async)
+curl -X POST http://localhost:8000/jobs/ingest/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@sample_pdfs/financial/rbi_capital_adequacy_circular.pdf"
+
+# ask a question -> returns a job_id immediately
+curl -X POST http://localhost:8000/jobs/query \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"question":"What is the minimum CRAR a bank must maintain?"}'
+
+# poll the job (or stream the ReAct trace at /jobs/{id}/stream)
+curl http://localhost:8000/jobs/<job_id> -H "Authorization: Bearer $TOKEN"
+```
+
+Open the **ops dashboard** at <http://localhost:8000/dashboard> (sign in with
+`bob` / `risk123`).
+
+### Seeded logins (dev defaults — change in production)
+
+| Username   | Password    | Tenant        | Role     |
+| ---------- | ----------- | ------------- | -------- |
+| `alice`    | `retail123` | `retail-bank` | analyst  |
+| `bob`      | `risk123`   | `risk-team`   | analyst  |
+| `reviewer` | `review123` | `risk-team`   | reviewer |
+
+### The watched-folder pipeline (optional, separate terminal)
+
+```bash
+python -m scripts.make_financial_corpus --to-inbox risk-team   # drop PDFs for the watcher
+python -m pipeline.watch                                        # auto-ingests inbox/<tenant>/*.pdf
+```
+
+### Just the RAG core, standalone (no API/auth/jobs)
+
+```bash
+python -m standalone.rag_minimal ingest --dir sample_pdfs/financial
+python -m standalone.rag_minimal ask --question "Summarise the risk disclosures."
+```
+
+### Scale-out with Celery + Redis + Docker (optional)
+
+See [docs/README_JOBS_ASYNC.md](docs/README_JOBS_ASYNC.md). In short:
+`set JOB_BACKEND=celery`, start Redis, start a worker, start the API.
 
 ---
 
-## Quick Start
+## Legacy quick demo
 
 ```bash
 python demo.py
 ```
 
-The demo downloads two ArXiv papers (the Transformer and RAG papers), ingests
-them, runs five research questions end-to-end with full ReAct traces, guardrail
-results, and RAGAS scores, then prints a batch-evaluation summary table.
+The original demo downloads two ArXiv papers, ingests them, and runs five
+questions end-to-end with ReAct traces, guardrail results, and RAGAS scores. It
+uses the legacy single-collection path and still works.
 
 ---
 
@@ -157,39 +245,62 @@ container instead of `localhost`.
 
 ---
 
-## Design Decisions
+## Design Decisions (the "why this stack" questions)
+
+The short version is below; each `understand_*` doc has the long version.
 
 - **Why custom ReAct over LangGraph** — Full control over the state machine,
-  easier to debug and explain in interviews, and no hidden abstractions. Every
-  Thought/Action/Observation is plain Python we can inspect and log.
+  easier to debug and explain, no hidden abstractions. Every
+  Thought/Action/Observation is plain Python we can inspect, log, and **audit**.
 
-- **Why hybrid retrieval** — Dense retrieval misses exact keyword matches; BM25
-  misses semantic similarity. Reciprocal Rank Fusion (RRF) of both gets the best
-  of each without tuning a brittle weighted sum.
+- **Why hybrid retrieval (dense + BM25 + RRF)** — Dense misses exact keyword
+  matches (e.g. "CET1", "CRAR"); BM25 misses semantic similarity. Reciprocal Rank
+  Fusion gets the best of both without tuning a brittle weighted sum.
 
-- **Why a cross-encoder reranker** — Bi-encoder (dense) retrieval is fast but
-  approximate. A cross-encoder scores query–chunk pairs jointly, giving much
-  higher precision for the top-N selection — worth the latency for research
-  quality.
+- **Why a cross-encoder reranker** — Bi-encoder retrieval is fast but
+  approximate. A cross-encoder scores query–chunk pairs jointly for much higher
+  top-N precision — worth the latency on regulatory text where wording matters.
 
-- **Why RAGAS per-query** — Catching faithfulness regressions per-query (not just
-  in batch eval) lets us flag bad outputs before they reach the user. MLflow
-  tracking makes regressions visible across experiments and over time.
+- **Why SQLite + SQLAlchemy (not Postgres) for state** — "Runs on my laptop."
+  SQLite is zero-install, one file, inspectable. Because everything goes through
+  the SQLAlchemy ORM, switching to Postgres is a one-line URL change.
 
-- **Guardrails design** — The input guard fails fast (injection → PII → topic) so
-  expensive LLM calls are never made on invalid input. Output citation grounding
-  is a lightweight cosine check, not another LLM call — keeping latency down
-  while still catching ungrounded claims.
+- **Why a thread job backend by default (not always Celery)** — Same async API
+  contract (submit → poll → stream) with **nothing to install**. `JOB_BACKEND=celery`
+  swaps in Redis + workers for real horizontal scale without changing endpoints.
+
+- **Why JWT (python-jose) + passlib** — Stateless, expiring tokens carrying
+  `tenant` + `role`, so a worker or a second replica verifies them with only the
+  shared secret — no session store. OIDC-shaped so a real IdP can replace it.
+
+- **Why a separate audit log (not "just MLflow")** — MLflow answers *"how is the
+  model doing over time?"*; the audit log answers *"what exactly did the system do
+  for query X, and who asked it?"*. Banks need the second one for compliance.
+
+- **Why human-in-the-loop on low confidence** — No LLM output reaches a user on a
+  low-confidence/low-faithfulness case without a human checkpoint. That is exactly
+  how production GenAI at banks works.
 
 ---
 
-## What I Would Add With More Time
+## What the feedback asked for → what was added
 
-- Streaming ReAct trace via SSE (Server-Sent Events) in the API
-- Async ingestion worker with a job queue (SQS / Redis)
-- Fine-tuned cross-encoder on domain-specific query–chunk pairs
-- Pinecone/Weaviate swap for a production vector store
-- LLM-as-judge scoring in addition to RAGAS
+| Gap identified                | What was built                                              | Where |
+| ----------------------------- | ---------------------------------------------------------- | ----- |
+| Generic use case              | Financial document corpus + topic-anchored guard            | `scripts/`, `configs/config.yaml` |
+| No async / job handling       | Job queue (thread default, Celery+Redis optional) + SSE     | `jobs/` |
+| No multi-tenancy              | JWT auth + per-tenant Chroma collections                    | `auth/`, `tenancy/` |
+| No data pipeline              | watchdog folder watcher + `documents` metadata table        | `pipeline/`, `db/` |
+| No auditability              | Structured `audit_log` with the full decision trail         | `audit/`, `db/` |
+| No human oversight            | `review_queue` for low-confidence reports                   | `serve/routers/review.py` |
+| No observability             | Chart.js ops dashboard over real metrics                    | `serve/static/`, `serve/routers/metrics.py` |
+
+### Still future work
+
+- Redis pub/sub stream bus so SSE works under the Celery backend too
+- Fine-tuned cross-encoder on domain query–chunk pairs
+- Pinecone/Weaviate swap for a managed vector store
+- Real OIDC issuer (Keycloak) instead of seeded users
 
 ---
 
@@ -197,41 +308,35 @@ container instead of `localhost`.
 
 ```
 research_analyst/
-├── ingestion/
-│   ├── chunker.py            # sentence-aware PDF chunking (PyMuPDF)
-│   ├── embedder.py           # SentenceTransformer wrapper (all-MiniLM)
-│   └── vector_store.py       # ChromaDB persistent store (cosine)
-├── retrieval/
-│   ├── dense.py              # dense vector retrieval
-│   ├── sparse.py             # BM25 sparse retrieval
-│   └── reranker.py           # RRF merge + cross-encoder rerank
-├── agents/
-│   ├── orchestrator.py       # pure-Python ReAct loop
-│   ├── retriever_agent.py    # retrieve + format context
-│   ├── analyst_agent.py      # analyse context, cite sources
-│   ├── critic_agent.py       # verify analysis, give feedback
-│   └── report_writer.py      # structured report + confidence score
-├── guardrails/
-│   ├── input_guard.py        # injection / PII / topic relevance
-│   └── output_guard.py       # grounding / toxicity / citations
-├── eval/
-│   ├── ragas_eval.py         # RAGAS metrics via local Ollama + HF embeddings
-│   └── golden_set.py         # 12 generic research questions
+├── ingestion/                # chunker · embedder · ChromaDB vector store
+├── retrieval/                # dense · sparse(BM25) · RRF + cross-encoder rerank
+├── agents/                   # ReAct orchestrator + retriever/analyst/critic + report writer
+├── guardrails/               # input (injection/PII/topic) + output (grounding/toxicity)
+├── eval/                     # RAGAS metrics + golden set
+│
+├── db/                       # 🆕 SQLAlchemy: tenants/users/documents/jobs/audit/review
+├── auth/                     # 🆕 JWT (jose) + passlib + seed + FastAPI deps
+├── tenancy/                  # 🆕 per-tenant pipeline registry (shared heavy models)
+├── core/                     # 🆕 tenant-aware query/ingest service (audit + review wiring)
+├── audit/                    # 🆕 structured audit logging + review resolution
+├── jobs/                     # 🆕 async queue: store · stream(SSE) · runners · thread/celery
+├── pipeline/                 # 🆕 watchdog folder watcher + standalone `watch` entrypoint
+│
 ├── serve/
-│   ├── api.py                # FastAPI app (lifespan, CORS, endpoints)
-│   ├── schemas.py            # Pydantic v2 request/response models
-│   └── middleware.py         # request timing + upload size limit
-├── tests/
-│   ├── test_guardrails.py
-│   └── test_eval.py
-├── configs/config.yaml       # all pipeline + serve + paths settings
-├── mlflow_tracker.py         # MLflow logging helpers
-├── main.py                   # CLI: ingest / query / eval
-├── demo.py                   # one-command live demo
-├── Dockerfile                # multi-stage build
-├── docker-compose.yml        # api + ollama + mlflow
-├── .dockerignore
-├── requirements.txt
-└── .github/workflows/eval_ci.yml
+│   ├── api.py                # FastAPI app (lifespan wires the whole stack)
+│   ├── state.py              # 🆕 shared app state for routers
+│   ├── routers/              # 🆕 auth · jobs · documents · review · metrics
+│   ├── static/dashboard.html # 🆕 Chart.js ops dashboard
+│   ├── schemas.py · middleware.py
+│
+├── standalone/rag_minimal.py # 🆕 self-contained runnable RAG (no API/auth/jobs)
+├── scripts/                  # 🆕 financial corpus generator + real-PDF downloader
+├── docs/                     # 🆕 README_* how-tos + understand_* theory↔code guides
+│
+├── configs/config.yaml       # all settings (pipeline + serve + auth + jobs + review)
+├── main.py · demo.py · mlflow_tracker.py
+├── Dockerfile · docker-compose.yml   # api + worker + redis + ollama + mlflow
+└── requirements.txt
 ```
+
 

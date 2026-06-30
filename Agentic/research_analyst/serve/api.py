@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from main import load_config, setup_pipeline, ingest
 from eval.golden_set import GOLDEN_SET
 from serve.middleware import RequestTimingMiddleware, RequestSizeLimitMiddleware
+from serve import state
 from serve.schemas import (
     EvalRequest,
     EvalResponse,
@@ -35,6 +36,18 @@ from serve.schemas import (
     QueryResponse,
     UploadResponse,
 )
+
+# Production "end to end" layers.
+from db.database import configure_database, init_db
+from auth.security import configure_auth
+from auth.seed import seed_auth
+from tenancy.registry import TenantRegistry
+from jobs.manager import JobManager
+from serve.routers import auth as auth_router
+from serve.routers import documents as documents_router
+from serve.routers import jobs as jobs_router
+from serve.routers import review as review_router
+from serve.routers import metrics as metrics_router
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +67,7 @@ _GENERIC_GROUND_TRUTH = "The document should contain relevant information about 
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialise pipeline components on startup; nothing to tear down on exit."""
+    """Initialise the full production stack on startup; clean up on exit."""
     # The OLLAMA_BASE_URL env var (set by docker-compose) must win over the YAML
     # value. load_config already applies this, but we re-apply defensively in
     # case the config was constructed differently.
@@ -63,16 +76,42 @@ async def lifespan(app: FastAPI):
         app_config["llm_base_url"] = ollama_base_url
         print(f"[API] Overriding llm_base_url from env: {ollama_base_url}")
 
-    print("[API] Starting pipeline setup...")
-    components.update(setup_pipeline(app_config))
+    # 1. Metadata database (users/tenants/documents/jobs/audit/review).
+    print("[API] Configuring metadata database...")
+    configure_database(app_config["paths"]["metadata_db"])
+    init_db()
+
+    # 2. Auth: configure JWT settings and seed default tenants/users.
+    configure_auth(app_config)
+    seed_auth(app_config)
+
+    # 3. Per-tenant pipeline registry (loads heavy models ONCE) + warm seeds.
+    print("[API] Building tenant registry...")
+    registry = TenantRegistry(app_config)
+    seed_tenant_ids = [t["id"] for t in app_config.get("auth", {}).get("seed_tenants", [])]
+    registry.warm(seed_tenant_ids)
+
+    # 4. Async job manager (thread backend by default; Celery if JOB_BACKEND=celery).
+    job_manager = JobManager(app_config, registry)
+
+    # 5. Publish shared state for the routers.
+    state.set_state(
+        app_config=app_config, tenant_registry=registry, jobs_manager=job_manager
+    )
+
+    # 6. Legacy single-collection endpoints reuse the "default" tenant bundle so
+    #    no models are loaded twice. New work should use the /jobs/* endpoints.
+    components.update(registry.get("default"))
 
     os.makedirs(app_config["paths"]["uploads"], exist_ok=True)
     os.makedirs(app_config["paths"]["eval_reports"], exist_ok=True)
+    os.makedirs(app_config["paths"]["inbox"], exist_ok=True)
     print("[API] Pipeline ready. Serving requests.")
 
     yield
 
-    # Shutdown: ChromaDB uses a persistent client — nothing to clean up.
+    # Shutdown.
+    job_manager.shutdown()
     print("[API] Shutting down.")
 
 
@@ -94,6 +133,16 @@ app.add_middleware(
     max_upload_size_mb=app_config["serve"]["max_upload_size_mb"],
 )
 app.add_middleware(RequestTimingMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# Production routers (JWT-protected, multi-tenant)
+# ---------------------------------------------------------------------------
+app.include_router(auth_router.router)
+app.include_router(jobs_router.router)
+app.include_router(documents_router.router)
+app.include_router(review_router.router)
+app.include_router(metrics_router.router)
 
 
 # ---------------------------------------------------------------------------

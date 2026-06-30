@@ -62,4 +62,90 @@ paths:
   uploads: "./uploads"
   eval_reports: "./eval_reports"
   sample_pdfs: "./sample_pdfs"
+  # Day 4 — production "end to end" paths
+  metadata_db: "./state/research_analyst.db"   # SQLite: users/tenants/docs/jobs/audit/review
+  inbox: "./inbox"                              # watched folder: drop PDFs in <inbox>/<tenant_id>/
+  dashboard_static: "./serve/static"           # monitoring dashboard HTML
+
+# ---------------------------------------------------------------------------
+# Day 4 — Financial Document Analyst skin
+# ---------------------------------------------------------------------------
+# The pipeline is domain-agnostic; this block only changes positioning and the
+# topic-relevance anchor so off-topic queries are rejected at the input guard.
+domain:
+  name: "Financial Document Analyst"
+  description: >
+    Regulatory and financial document intelligence: earnings reports, RBI / SEBI
+    circulars, Basel III policy documents, and bank annual reports.
+  topic_anchor: >
+    banking, finance, capital adequacy, Basel III, RBI, SEBI, regulatory
+    circular, risk disclosure, annual report, earnings, liquidity, credit risk.
+
+# ---------------------------------------------------------------------------
+# Day 4 — Authentication (JWT) + multi-tenancy
+# ---------------------------------------------------------------------------
+auth:
+  # IMPORTANT: override JWT_SECRET_KEY via environment in any real deployment.
+  secret_env_var: "JWT_SECRET_KEY"
+  default_secret: "dev-only-insecure-change-me"
+  algorithm: "HS256"
+  access_token_expire_minutes: 480          # 8h dev tokens
+  # Tenants and seed users created on first startup (passwords are dev defaults).
+  seed_tenants:
+    - id: "retail-bank"
+      name: "Retail Banking"
+    - id: "risk-team"
+      name: "Risk & Compliance"
+  seed_users:
+    - username: "alice"
+      password: "retail123"
+      tenant_id: "retail-bank"
+      role: "analyst"
+    - username: "bob"
+      password: "risk123"
+      tenant_id: "risk-team"
+      role: "analyst"
+    - username: "reviewer"
+      password: "review123"
+      tenant_id: "risk-team"
+      role: "reviewer"
+
+# ---------------------------------------------------------------------------
+# Day 4 — Async job queue
+# ---------------------------------------------------------------------------
+jobs:
+  # backend: "thread" (in-process, zero infra, laptop default) | "celery" (Redis)
+  # Override at runtime with the JOB_BACKEND environment variable.
+  backend: "thread"
+  thread_workers: 2
+  celery_broker_url: "redis://localhost:6379/0"
+  celery_result_backend: "redis://localhost:6379/1"
+  stream_poll_interval: 0.5                  # seconds between SSE trace polls
+
+# ---------------------------------------------------------------------------
+# Day 4 — Human-in-the-loop review queue
+# ---------------------------------------------------------------------------
+review:
+  # A report is flagged for human review when EITHER threshold is breached.
+  confidence_threshold: 0.60
+  faithfulness_threshold: 0.50
+
+# ---------------------------------------------------------------------------
+# Day 4 — Exact-match query cache
+# ---------------------------------------------------------------------------
+cache:
+  # Caches auto-approved answers keyed by (tenant, normalized question). Skips
+  # the whole ReAct + LLM + RAGAS pipeline on repeats. Invalidated per tenant
+  # whenever that tenant ingests new documents, so hits are never stale.
+  enabled: true
+  ttl_seconds: 0          # 0 = no time expiry (rely on ingest invalidation)
+
+# ---------------------------------------------------------------------------
+# Day 4 — Watched-folder ingestion pipeline
+# ---------------------------------------------------------------------------
+watcher:
+  enabled: false                             # started explicitly via pipeline/watch.py
+  poll_interval_seconds: 2
+  patterns:
+    - "*.pdf"
 

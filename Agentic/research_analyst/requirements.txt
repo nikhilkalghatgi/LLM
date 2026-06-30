@@ -1,3 +1,6 @@
+# ---------------------------------------------------------------------------
+# Core RAG pipeline
+# ---------------------------------------------------------------------------
 pymupdf
 sentence-transformers
 chromadb
@@ -7,13 +10,42 @@ pyyaml
 mlflow
 nltk
 numpy
-fastapi
-uvicorn[standard]
-python-multipart
+torch
+
+# ---------------------------------------------------------------------------
+# Evaluation
+# ---------------------------------------------------------------------------
 ragas
 datasets
-torch
 guardrails-ai
 langchain-community
 langchain-core
+
+# ---------------------------------------------------------------------------
+# API layer
+# ---------------------------------------------------------------------------
+fastapi
+uvicorn[standard]
+python-multipart
+sse-starlette              # Server-Sent Events for streaming the ReAct trace
+
+# ---------------------------------------------------------------------------
+# Production "end to end" additions
+# ---------------------------------------------------------------------------
+sqlalchemy                 # audit log + documents + jobs + review-queue metadata DB
+python-jose[cryptography]  # JWT encode / decode
+passlib[bcrypt]            # password hashing
+watchdog                   # watched-folder ingestion pipeline
+reportlab                  # generate the offline-safe sample financial PDF corpus
+
+# ---------------------------------------------------------------------------
+# Optional production job queue (only needed when JOB_BACKEND=celery)
+# ---------------------------------------------------------------------------
+celery
+redis
+
+# ---------------------------------------------------------------------------
+# Testing
+# ---------------------------------------------------------------------------
 pytest
+httpx                      # FastAPI TestClient for endpoint tests

@@ -208,6 +208,20 @@ class ReActOrchestrator:
                 trace — list of step dicts
                 steps_taken — int
         """
+        return self.run_with_callback(query, step_callback=None)
+
+    def run_with_callback(self, query: str, step_callback=None) -> Dict:
+        """Execute the ReAct loop, optionally emitting each step to a callback.
+
+        Args:
+            query: The research question.
+            step_callback: Optional ``fn(step_dict)`` invoked after every step.
+                Used by the SSE endpoint to stream the trace as it is produced.
+
+        Returns:
+            Dict with keys: report, trace, steps_taken, analysis, feedback,
+            retrieved_chunks.
+        """
         # Reset context for each new query
         self._context = {
             "formatted_context": None,
@@ -237,26 +251,32 @@ class ReActOrchestrator:
                 # Use the latest analysis if finish input is sparse
                 if len(report) < 50 and self._context.get("analysis"):
                     report = self._context["analysis"]
-                trace.append({
+                step_record = {
                     "step": step_num,
                     "thought": action["reasoning"],
                     "action": action["tool"],
                     "action_input": action["input"],
                     "observation": "Final report delivered.",
-                })
+                }
+                trace.append(step_record)
+                if step_callback is not None:
+                    step_callback(step_record)
                 print("Observation: Final report delivered.")
                 break
 
             observation = self._dispatch(action, self._context)
             print(f"Observation: {observation[:300]}...")
 
-            trace.append({
+            step_record = {
                 "step": step_num,
                 "thought": action["reasoning"],
                 "action": action["tool"],
                 "action_input": action["input"],
                 "observation": observation,
-            })
+            }
+            trace.append(step_record)
+            if step_callback is not None:
+                step_callback(step_record)
 
         # If loop exhausted without finish, use latest analysis
         if not report:
